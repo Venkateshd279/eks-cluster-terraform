@@ -1,0 +1,16 @@
+# AWS Configuration
+aws_region     = "ap-south-1"  # Mumbai region
+cluster_name   = "altimetrik-eks-cluster"
+cluster_version = "1.28"
+
+# EC2 Configuration - Using existing key pair
+key_pair_name = "python"  # Your existing key pair name (without .pem extension)
+web_server_instance_type = "t2.micro"
+app_server_instance_type = "t2.micro"
+
+# Alternative configurations
+# aws_region     = "us-west-2"  # Alternative region
+# cluster_name   = "my-custom-eks-cluster"
+# cluster_version = "1.29"  # Latest version
+# web_server_instance_type = "t3.small"  # For better performance
+# app_server_instance_type = "t3.small"  # For better performance
