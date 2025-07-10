@@ -1,0 +1,122 @@
+{
+    "folders": [
+        {
+            "name": "EKS Terraform Infrastructure",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "kubernetes.defaultNamespace": "sample-apps",
+        "kubernetes.useWsl": false,
+        "kubernetes.checkForMinikubeUpgrade": false,
+        "kubernetes.outputFormat": "yaml",
+        "vs-kubernetes": {
+            "vs-kubernetes.crd-code-completion": "enabled",
+            "vs-kubernetes.kubectl-path.windows": "kubectl",
+            "vs-kubernetes.helm-path.windows": "helm",
+            "vs-kubernetes.draft-path.windows": "draft"
+        },
+        "yaml.schemas": {
+            "kubernetes://schema/v1/Pod": "k8s-apps/**/*.yaml",
+            "kubernetes://schema/v1/Service": "k8s-apps/**/*.yaml",
+            "kubernetes://schema/apps/v1/Deployment": "k8s-apps/**/*.yaml",
+            "kubernetes://schema/v1/ConfigMap": "k8s-apps/**/*.yaml",
+            "kubernetes://schema/networking.k8s.io/v1/Ingress": "k8s-apps/**/*.yaml"
+        },
+        "files.associations": {
+            "*.yaml": "yaml",
+            "*.yml": "yaml",
+            "Jenkinsfile": "groovy"
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-kubernetes-tools.vscode-kubernetes-tools",
+            "ms-vscode.azure-account",
+            "hashicorp.terraform",
+            "redhat.vscode-yaml",
+            "ms-vscode.powershell"
+        ]
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "Test App Locally",
+                "type": "shell",
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "./scripts/test-locally.ps1"
+                ],
+                "group": "test",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "new"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "Deploy to EKS",
+                "type": "shell",
+                "command": "powershell",
+                "args": [
+                    "-Command",
+                    "cd k8s-apps/sample-web-app; kubectl apply -f namespace.yaml; kubectl apply -f configmap.yaml; kubectl apply -f deployment.yaml; kubectl apply -f service.yaml"
+                ],
+                "group": "build",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "new"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "Check EKS Status",
+                "type": "shell",
+                "command": "kubectl",
+                "args": [
+                    "get",
+                    "all",
+                    "-n",
+                    "sample-apps"
+                ],
+                "group": "test",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "new"
+                },
+                "problemMatcher": []
+            },
+            {
+                "label": "Port Forward to App",
+                "type": "shell",
+                "command": "kubectl",
+                "args": [
+                    "port-forward",
+                    "service/sample-web-app-service",
+                    "8080:80",
+                    "-n",
+                    "sample-apps"
+                ],
+                "group": "test",
+                "presentation": {
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "new"
+                },
+                "problemMatcher": [],
+                "isBackground": true
+            }
+        ]
+    }
+}
