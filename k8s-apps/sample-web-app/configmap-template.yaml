@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-app-content
+  namespace: sample-apps
+  labels:
+    app: sample-web-app
+data:
+  # This ConfigMap now references content from index.html
+  # To update the web content:
+  # 1. Edit index.html file
+  # 2. Generate updated ConfigMap: .\scripts\update-configmap.ps1
+  # 3. Apply: kubectl apply -f configmap.yaml
+  # 4. Restart pods: kubectl rollout restart deployment/sample-web-app -n sample-apps
+  
+  index.html: |
+    <!-- Content will be inserted here automatically from index.html -->
+    <!-- Do not edit this section manually -->
+    <!-- Use the separate index.html file for HTML changes -->
