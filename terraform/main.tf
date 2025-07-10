@@ -778,7 +778,8 @@ resource "aws_lb" "web_alb" {
   }
 }
 
-# Target Group for Web Servers
+# Target Group for Web Servers - Managed by AWS Load Balancer Controller
+# Note: Targets are automatically managed by Kubernetes Ingress Controller
 resource "aws_lb_target_group" "web_tg" {
   name     = "${var.cluster_name}-web-tg"
   port     = 80
@@ -802,18 +803,9 @@ resource "aws_lb_target_group" "web_tg" {
   }
 }
 
-# Target Group Attachments
-resource "aws_lb_target_group_attachment" "web_server_1" {
-  target_group_arn = aws_lb_target_group.web_tg.arn
-  target_id        = aws_instance.web_server_1.id
-  port             = 80
-}
-
-resource "aws_lb_target_group_attachment" "web_server_2" {
-  target_group_arn = aws_lb_target_group.web_tg.arn
-  target_id        = aws_instance.web_server_2.id
-  port             = 80
-}
+# Target Group Attachments - REMOVED
+# These are now managed automatically by AWS Load Balancer Controller
+# The Kubernetes Ingress will automatically register/deregister pod IPs
 
 # ALB Listener
 resource "aws_lb_listener" "web_listener" {
