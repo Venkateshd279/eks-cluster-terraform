@@ -23,10 +23,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                script {
-                    echo "🔄 Checking out source code..."
-                    checkout scm
-                }
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'githubtoken', url: 'https://github.com/Venkateshd279/eks-cluster-terraform.git']])
             }
         }
         
