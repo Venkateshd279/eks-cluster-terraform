@@ -19,7 +19,7 @@ pipeline {
         AWS_CREDENTIALS = credentials('aws-credentials')
         KUBECONFIG_CREDENTIAL = credentials('kubeconfig-file')
     }
-    
+    // Test
     stages {
         stage('Checkout') {
             steps {
