@@ -77,9 +77,34 @@ pipeline {
                     
                     // Add build info to ConfigMap
                     sh """
-                        # Update ConfigMap with build information
-                        if [ -f k8s-apps/sample-web-app/configmap.yaml ]; then
-                            sed -i 's|Build: .*|Build: #${BUILD_NUMBER} - ${BUILD_TIMESTAMP}|g' k8s-apps/sample-web-app/configmap.yaml
+                        # Create build timestamp
+                        BUILD_TIMESTAMP=\$(date '+%Y-%m-%d %H:%M:%S')
+                        
+                        echo "Current directory: \$(pwd)"
+                        echo "Listing files:"
+                        ls -la
+                        
+                        # Check if k8s-apps directory exists
+                        if [ -d "k8s-apps/sample-web-app" ]; then
+                            echo "Found k8s-apps/sample-web-app directory"
+                            ls -la k8s-apps/sample-web-app/
+                            
+                            # Update ConfigMap with build information
+                            if [ -f k8s-apps/sample-web-app/configmap.yaml ]; then
+                                echo "Updating ConfigMap with build #${BUILD_NUMBER}"
+                                sed -i "s|Build: .*|Build: #${BUILD_NUMBER} - \$BUILD_TIMESTAMP|g" k8s-apps/sample-web-app/configmap.yaml
+                                echo "ConfigMap updated successfully"
+                                
+                                # Show the updated content
+                                echo "Updated ConfigMap content:"
+                                grep -A5 -B5 "Build:" k8s-apps/sample-web-app/configmap.yaml || echo "Build line not found"
+                            else
+                                echo "ConfigMap file not found at k8s-apps/sample-web-app/configmap.yaml"
+                            fi
+                        else
+                            echo "k8s-apps/sample-web-app directory not found"
+                            echo "Available directories:"
+                            find . -type d -name "*k8s*" -o -name "*app*" | head -10
                         fi
                     """
                 }
