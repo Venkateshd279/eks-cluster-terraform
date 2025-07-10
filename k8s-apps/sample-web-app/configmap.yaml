@@ -10,7 +10,7 @@ data:
   # 1. Edit the HTML content below directly
   # 2. Apply: kubectl apply -f configmap.yaml
   # 3. Restart: kubectl rollout restart deployment/sample-web-app -n sample-apps
-  
+  # 4. Check pods running status: kubectl get pods -n sample-apps
   index.html: |
     <!DOCTYPE html>
 
@@ -18,7 +18,7 @@ data:
 
     <body>
 
-        <h1>This K8s CICD pipeline </h1>
+        <h1>This K8s CICD pipeline Test 2</h1>
 
         <p>Running on Kubernetes</p>
 

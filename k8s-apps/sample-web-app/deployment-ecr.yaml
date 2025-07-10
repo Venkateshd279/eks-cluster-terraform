@@ -52,9 +52,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        volumeMounts:
-        - name: html-content
-          mountPath: /usr/share/nginx/html
+        # NOTE: No ConfigMap volume mount - HTML is baked into the Docker image
         livenessProbe:
           httpGet:
             path: /
@@ -67,9 +65,6 @@ spec:
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 5
-      volumes:
-      - name: html-content
-        configMap:
-          name: web-app-content
+      # NOTE: No ConfigMap volume - HTML is baked into the Docker image
       restartPolicy: Always
 ---
