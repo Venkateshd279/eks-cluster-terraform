@@ -101,6 +101,7 @@ data:
                 <p><strong>Region:</strong> ap-south-1 (Mumbai)</p>
                 <p><strong>Namespace:</strong> sample-apps</p>
                 <p><strong>Deployment Time:</strong> <span id="timestamp"></span></p>
+                <p><strong>Build:</strong> #INITIAL - CI/CD Test</p>
             </div>
 
             <div class="tech-stack">
