@@ -18,7 +18,7 @@ data:
 
     <body>
 
-        <h1>This K8s CICD pipeline DEMO</h1>
+        <h1>This K8s CICD pipeline </h1>
 
         <p>Running on Kubernetes</p>
 
