@@ -1,0 +1,16 @@
+apiVersion: v1
+data:
+  mapRoles: |
+    - groups:
+      - system:bootstrappers
+      - system:nodes
+      rolearn: arn:aws:iam::897722681721:role/my-eks-cluster-node-role
+      username: system:node:{{EC2PrivateDNSName}}
+    - groups:
+      - system:masters
+      rolearn: arn:aws:iam::897722681721:role/my-eks-cluster-jenkins-role
+      username: jenkins
+kind: ConfigMap
+metadata:
+  name: aws-auth
+  namespace: kube-system

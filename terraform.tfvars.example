@@ -1,12 +1,18 @@
-# AWS Configuration
-aws_region     = "ap-south-1"  # Mumbai region
-cluster_name   = "altimetrik-eks-cluster"
-cluster_version = "1.28"
+# AWS Configuration - UPDATE THESE VALUES
+aws_region      = "ap-south-1"                # Your preferred AWS region
+cluster_name    = "my-eks-cluster"            # Your EKS cluster name
+cluster_version = "1.32"                      # Latest EKS version
 
-# EC2 Configuration - Using existing key pair
-key_pair_name = "python"  # Your existing key pair name (without .pem extension)
-web_server_instance_type = "t2.micro"
-app_server_instance_type = "t2.micro"
+# EC2 Configuration - UPDATE WITH YOUR KEY PAIR NAME
+key_pair_name            = "your-key-name"    # Your existing EC2 key pair (without .pem)
+web_server_instance_type = "t2.medium"        # Web server instance type
+app_server_instance_type = "t2.medium"        # App server instance type
+
+# SECURITY INSTRUCTIONS:
+# 1. Copy this file to terraform.tfvars: cp terraform.tfvars.example terraform.tfvars
+# 2. Update the values above with your actual configuration
+# 3. NEVER commit terraform.tfvars to version control (it's in .gitignore)
+# 4. Only commit this example file (terraform.tfvars.example) to GitHub
 
 # Alternative configurations
 # aws_region     = "us-west-2"  # Alternative region

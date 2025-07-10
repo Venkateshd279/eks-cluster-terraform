@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-web-app
+  namespace: default
+  labels:
+    app: sample-web-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sample-web-app
+  template:
+    metadata:
+      labels:
+        app: sample-web-app
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        env:
+        - name: CLUSTER_NAME
+          value: "my-eks-cluster"
+        volumeMounts:
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html-content
+        configMap:
+          name: web-app-content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-app-content
+  namespace: default
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EKS Cluster Application</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container {
+                text-align: center;
+                padding: 2rem;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+                max-width: 600px;
+            }
+            h1 {
+                margin-bottom: 1rem;
+                font-size: 2.5rem;
+            }
+            .cluster-info {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 1rem;
+                border-radius: 10px;
+                margin: 1rem 0;
+            }
+            .status {
+                color: #4CAF50;
+                font-weight: bold;
+            }
+            .tech-stack {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 1rem;
+                margin-top: 2rem;
+            }
+            .tech-item {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 1rem;
+                border-radius: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 EKS Cluster Application</h1>
+            <p class="status">✅ Application Successfully Deployed!</p>
+            
+            <div class="cluster-info">
+                <h3>Cluster Information</h3>
+                <p><strong>Cluster Name:</strong> my-eks-cluster</p>
+                <p><strong>Kubernetes Version:</strong> 1.32</p>
+                <p><strong>Region:</strong> ap-south-1</p>
+                <p><strong>Deployment Time:</strong> <span id="timestamp"></span></p>
+            </div>
+
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>☸️ Kubernetes</h4>
+                    <p>EKS v1.32</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🏗️ Terraform</h4>
+                    <p>Infrastructure as Code</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🌐 AWS ALB</h4>
+                    <p>Load Balancer</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🔒 VPC</h4>
+                    <p>Multi-AZ Network</p>
+                </div>
+            </div>
+
+            <p style="margin-top: 2rem;">
+                <strong>Pod Hostname:</strong> <span id="hostname">Loading...</span><br>
+                <strong>Pod IP:</strong> <span id="pod-ip">Loading...</span>
+            </p>
+        </div>
+
+        <script>
+            document.getElementById('timestamp').textContent = new Date().toLocaleString();
+            
+            // Simulate pod information (would normally come from environment variables)
+            document.getElementById('hostname').textContent = window.location.hostname || 'nginx-pod';
+            document.getElementById('pod-ip').textContent = 'Dynamic IP';
+        </script>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-web-app-service
+  namespace: default
+  labels:
+    app: sample-web-app
+spec:
+  selector:
+    app: sample-web-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP

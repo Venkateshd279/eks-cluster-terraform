@@ -1,0 +1,262 @@
+pipeline {
+    agent any
+    
+    environment {
+        // AWS Configuration
+        AWS_REGION = 'ap-south-1'
+        EKS_CLUSTER_NAME = 'my-eks-cluster'
+        
+        // Application Configuration
+        APP_NAME = 'sample-web-app'
+        NAMESPACE = 'sample-apps'
+        
+        // Docker/ECR Configuration
+        AWS_ACCOUNT_ID = '897722681721'
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_REPO = "${ECR_REGISTRY}/${APP_NAME}"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        
+        // Kubernetes manifests path
+        K8S_MANIFESTS_PATH = 'k8s-apps/sample-web-app'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo '🔄 Checking out source code...'
+                // Code is automatically checked out by Jenkins
+                script {
+                    // Get git commit info for tagging
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.IMAGE_TAG = "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
+                }
+                echo "📋 Build Number: ${BUILD_NUMBER}"
+                echo "📋 Git Commit: ${GIT_COMMIT_SHORT}"
+                echo "📋 Image Tag: ${IMAGE_TAG}"
+            }
+        }
+        
+        stage('Environment Setup') {
+            steps {
+                echo '⚙️ Setting up environment...'
+                script {
+                    sh '''
+                        echo "Checking tools..."
+                        aws --version
+                        kubectl version --client
+                        docker --version
+                        
+                        echo "Configuring AWS CLI..."
+                        aws configure set region $AWS_REGION
+                        aws configure set output json
+                        
+                        echo "Current AWS Identity:"
+                        aws sts get-caller-identity
+                    '''
+                }
+            }
+        }
+        
+        stage('Create ECR Repository') {
+            steps {
+                echo '📦 Creating ECR repository if it doesn\'t exist...'
+                script {
+                    sh '''
+                        # Check if repository exists, create if not
+                        aws ecr describe-repositories --repository-names $APP_NAME --region $AWS_REGION || \
+                        aws ecr create-repository --repository-name $APP_NAME --region $AWS_REGION
+                        
+                        echo "ECR Repository: $IMAGE_REPO"
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                echo '🐳 Building Docker image...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            echo "Building Docker image..."
+                            docker build -t $APP_NAME:$IMAGE_TAG .
+                            docker tag $APP_NAME:$IMAGE_TAG $IMAGE_REPO:$IMAGE_TAG
+                            docker tag $APP_NAME:$IMAGE_TAG $IMAGE_REPO:latest
+                            
+                            echo "Docker images built:"
+                            docker images | grep $APP_NAME
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Push to ECR') {
+            steps {
+                echo '⬆️ Pushing image to ECR...'
+                script {
+                    sh '''
+                        echo "Logging in to ECR..."
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                        
+                        echo "Pushing Docker image to ECR..."
+                        docker push $IMAGE_REPO:$IMAGE_TAG
+                        docker push $IMAGE_REPO:latest
+                        
+                        echo "Image pushed successfully!"
+                        echo "Image URI: $IMAGE_REPO:$IMAGE_TAG"
+                    '''
+                }
+            }
+        }
+        
+        stage('Update Kubernetes Manifests') {
+            steps {
+                echo '📝 Updating Kubernetes manifests...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            # Update deployment.yaml with new image
+                            sed -i "s|image: nginx:.*|image: $IMAGE_REPO:$IMAGE_TAG|g" deployment.yaml
+                            
+                            echo "Updated deployment.yaml:"
+                            grep -A 2 -B 2 "image:" deployment.yaml
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Configure EKS Access') {
+            steps {
+                echo '🔐 Configuring EKS access...'
+                script {
+                    sh '''
+                        echo "Updating kubeconfig for EKS cluster..."
+                        aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+                        
+                        echo "Verifying kubectl access..."
+                        kubectl cluster-info
+                        kubectl get nodes
+                    '''
+                }
+            }
+        }
+        
+        stage('Deploy to EKS') {
+            steps {
+                echo '🚀 Deploying to EKS cluster...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            echo "Applying Kubernetes manifests..."
+                            
+                            # Apply manifests in order
+                            kubectl apply -f namespace.yaml
+                            kubectl apply -f configmap.yaml
+                            kubectl apply -f deployment.yaml
+                            kubectl apply -f service.yaml
+                            kubectl apply -f ingress.yaml
+                            
+                            echo "Deployment completed!"
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Wait for Deployment') {
+            steps {
+                echo '⏳ Waiting for deployment to be ready...'
+                script {
+                    sh '''
+                        echo "Waiting for deployment rollout..."
+                        kubectl rollout status deployment/$APP_NAME -n $NAMESPACE --timeout=300s
+                        
+                        echo "Checking pod status..."
+                        kubectl get pods -n $NAMESPACE -l app=$APP_NAME
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                echo '✅ Verifying deployment...'
+                script {
+                    sh '''
+                        echo "Getting deployment information..."
+                        kubectl get all -n $NAMESPACE -l app=$APP_NAME
+                        
+                        echo "Checking service endpoints..."
+                        kubectl get svc -n $NAMESPACE
+                        
+                        echo "Checking ingress..."
+                        kubectl get ingress -n $NAMESPACE
+                        
+                        # Get LoadBalancer URL if available
+                        LB_URL=$(kubectl get ingress -n $NAMESPACE -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "LoadBalancer not ready yet")
+                        echo "Application URL: http://$LB_URL"
+                    '''
+                }
+            }
+        }
+        
+        stage('Cleanup') {
+            steps {
+                echo '🧹 Cleaning up local Docker images...'
+                script {
+                    sh '''
+                        echo "Removing local Docker images..."
+                        docker rmi $APP_NAME:$IMAGE_TAG || true
+                        docker rmi $IMAGE_REPO:$IMAGE_TAG || true
+                        docker rmi $IMAGE_REPO:latest || true
+                        
+                        echo "Cleanup completed!"
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo '📊 Pipeline execution completed!'
+            script {
+                sh '''
+                    echo "==================================="
+                    echo "Pipeline Summary"
+                    echo "==================================="
+                    echo "Application: $APP_NAME"
+                    echo "Namespace: $NAMESPACE"
+                    echo "Image: $IMAGE_REPO:$IMAGE_TAG"
+                    echo "Build: $BUILD_NUMBER"
+                    echo "Git Commit: $GIT_COMMIT_SHORT"
+                    echo "==================================="
+                '''
+            }
+        }
+        success {
+            echo '✅ Pipeline executed successfully!'
+            script {
+                sh '''
+                    echo "🎉 Deployment successful!"
+                    echo "Check your application at:"
+                    kubectl get ingress -n $NAMESPACE
+                '''
+            }
+        }
+        failure {
+            echo '❌ Pipeline failed!'
+            script {
+                sh '''
+                    echo "Pipeline failed. Checking logs..."
+                    kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -10
+                '''
+            }
+        }
+    }
+}

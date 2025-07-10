@@ -1,5 +1,55 @@
 # EKS Cluster with Web Servers, App Servers, and Application Load Balancer
 
+## 🔒 SECURITY WARNING - READ BEFORE PUSHING TO GITHUB
+
+**⚠️ IMPORTANT:** This repository contains sensitive configuration files that should NEVER be pushed to public repositories.
+
+### Protected Files (Already in .gitignore):
+- `terraform.tfvars` - Contains your AWS configuration
+- `*.tfstate` - Contains infrastructure state with sensitive data
+- `*.pem` - SSH private keys
+- AWS credentials and config files
+
+### Safe to Push:
+- `terraform.tfvars.example` - Example configuration (no real values)
+- All `.tf` files - Infrastructure code
+- `README.md` - Documentation
+- `.gitignore` - Protection rules
+
+### Before Every Git Push:
+
+**🛡️ AUTOMATED SECURITY CHECK:** Use one of these scripts to automatically verify no sensitive files are staged:
+
+#### Option 1: Bash Script (Git Bash/WSL/Linux)
+```bash
+bash scripts/security-check.sh
+```
+
+#### Option 2: Windows Batch Script
+```cmd
+scripts\security-check.bat
+```
+
+#### Option 3: PowerShell Script (Recommended for Windows)
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\security-check.ps1
+```
+
+#### Manual Verification (if scripts unavailable):
+```bash
+# Verify no sensitive files are staged
+git status
+git diff --cached
+
+# Never force add ignored files
+git add . # ✅ Safe (respects .gitignore)
+git add -f terraform.tfvars # ❌ DANGEROUS - Never do this
+```
+
+**💡 Tip:** Add a git pre-push hook to run the security check automatically!
+
+# EKS Cluster with Web Servers, App Servers, and Application Load Balancer
+
 This Terraform configuration creates an Amazon EKS cluster with a complete web application infrastructure including:
 
 ## Architecture Overview
@@ -41,7 +91,7 @@ This Terraform configuration creates an Amazon EKS cluster with a complete web a
 - Both HTTP (8080) and HTTPS (8443) support
 
 ### EKS Cluster
-- Cluster name: `altimetrik-eks-cluster` (configurable)
+- Cluster name: `my-eks-cluster` (configurable)
 - Version: 1.28 (configurable)
 - Control plane logging enabled
 - Both private and public endpoint access enabled
@@ -75,6 +125,34 @@ This Terraform configuration creates an Amazon EKS cluster with a complete web a
 
 ## Usage
 
+### 🔒 Security Setup (One-time)
+
+#### Option 1: Set up Git Pre-Push Hook (Recommended)
+```bash
+# Create the hooks directory if it doesn't exist
+mkdir -p .git/hooks
+
+# Create a pre-push hook that runs the security check
+cat > .git/hooks/pre-push << 'EOF'
+#!/bin/bash
+echo "Running security check before push..."
+bash scripts/security-check.sh
+if [ $? -ne 0 ]; then
+    echo "Push aborted due to security check failure."
+    exit 1
+fi
+EOF
+
+# Make the hook executable
+chmod +x .git/hooks/pre-push
+```
+
+#### Option 2: Manual Check Before Each Push
+Always run one of these before `git push`:
+- `bash scripts/security-check.sh` (Bash)
+- `scripts\security-check.bat` (Batch)
+- `powershell -ExecutionPolicy Bypass -File scripts\security-check.ps1` (PowerShell)
+
 ### 1. Verify Your Key Pair Exists
 Make sure your `python` key pair exists in the ap-south-1 region:
 ```bash
@@ -96,16 +174,16 @@ terraform init
 The configuration is pre-set for:
 - **Region**: ap-south-1 (Mumbai)
 - **Key Pair**: python (your existing key)
-- **Cluster**: altimetrik-eks-cluster
+- **Cluster**: my-eks-cluster
 
 You can modify `terraform.tfvars` if needed:
 ```hcl
 aws_region = "ap-south-1"
-cluster_name = "altimetrik-eks-cluster"
+cluster_name = "my-eks-cluster"
 cluster_version = "1.28"
 key_pair_name = "python"
-web_server_instance_type = "t2.micro"
-app_server_instance_type = "t2.micro"
+web_server_instance_type = "t2.medium"
+app_server_instance_type = "t2.medium"
 ```
 
 ### 4. Plan the Deployment
@@ -121,7 +199,7 @@ terraform apply
 ### 6. Configure kubectl
 After deployment, configure kubectl to connect to your cluster:
 ```bash
-aws eks update-kubeconfig --region ap-south-1 --name altimetrik-eks-cluster
+aws eks update-kubeconfig --region ap-south-1 --name my-eks-cluster
 ```
 
 ## Post-Deployment Setup

@@ -54,7 +54,7 @@ const getPrivateIP = () => {
 app.get('/', (req, res) => {
     res.json({
         status: 'healthy',
-        message: '🚀 Altimetrik App Server is running!',
+        message: '🚀 App Server is running!',
         server: getInstanceInfo()
     });
 });
@@ -62,7 +62,7 @@ app.get('/', (req, res) => {
 // Detailed info endpoint
 app.get('/info', (req, res) => {
     res.json({
-        application: 'Altimetrik App Server',
+        application: 'App Server',
         version: '1.0.0',
         environment: 'production',
         server: getInstanceInfo(),
@@ -178,9 +178,9 @@ EOF
 # Create package.json
 cat > package.json << 'EOF'
 {
-  "name": "altimetrik-app-server",
+  "name": "my-app-server",
   "version": "1.0.0",
-  "description": "Altimetrik Application Server",
+  "description": "Application Server",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -201,7 +201,7 @@ npm install
 # Create systemd service for the app
 cat > /etc/systemd/system/app-server.service << 'EOF'
 [Unit]
-Description=Altimetrik App Server
+Description=App Server
 After=network.target
 
 [Service]

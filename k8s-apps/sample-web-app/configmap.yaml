@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-app-content
+  namespace: sample-apps
+  labels:
+    app: sample-web-app
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EKS Cluster Sample Application</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container {
+                text-align: center;
+                padding: 2rem;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+                max-width: 700px;
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            }
+            h1 {
+                margin-bottom: 1rem;
+                font-size: 2.5rem;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }
+            .cluster-info {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 1.5rem;
+                border-radius: 10px;
+                margin: 1rem 0;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }
+            .status {
+                color: #4CAF50;
+                font-weight: bold;
+                font-size: 1.2rem;
+                margin-bottom: 1rem;
+            }
+            .tech-stack {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 1rem;
+                margin-top: 2rem;
+            }
+            .tech-item {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 1rem;
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                transition: transform 0.3s ease;
+            }
+            .tech-item:hover {
+                transform: translateY(-2px);
+            }
+            .pod-info {
+                background: rgba(0, 0, 0, 0.2);
+                padding: 1rem;
+                border-radius: 8px;
+                margin-top: 1rem;
+                font-family: 'Courier New', monospace;
+            }
+            .namespace-badge {
+                background: #FF6B6B;
+                color: white;
+                padding: 0.3rem 0.8rem;
+                border-radius: 20px;
+                font-size: 0.9rem;
+                font-weight: bold;
+                display: inline-block;
+                margin: 0.5rem 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 EKS Sample Application</h1>
+            <p class="status">✅ Successfully Deployed on EKS!</p>
+            
+            <div class="namespace-badge">📦 Namespace: sample-apps</div>
+            
+            <div class="cluster-info">
+                <h3>🏗️ Infrastructure Details</h3>
+                <p><strong>Cluster Name:</strong> my-eks-cluster</p>
+                <p><strong>Kubernetes Version:</strong> 1.32</p>
+                <p><strong>Region:</strong> ap-south-1 (Mumbai)</p>
+                <p><strong>Namespace:</strong> sample-apps</p>
+                <p><strong>Deployment Time:</strong> <span id="timestamp"></span></p>
+            </div>
+
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>☸️ Kubernetes</h4>
+                    <p>EKS v1.32</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🏗️ Terraform</h4>
+                    <p>Infrastructure as Code</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🌐 AWS ALB</h4>
+                    <p>Application Load Balancer</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🔒 VPC</h4>
+                    <p>Multi-AZ Security</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🐳 Container</h4>
+                    <p>Nginx + Custom HTML</p>
+                </div>
+                <div class="tech-item">
+                    <h4>📊 Replicas</h4>
+                    <p>3 Pod Instances</p>
+                </div>
+            </div>
+
+            <div class="pod-info">
+                <h4>🐳 Pod Information</h4>
+                <p><strong>Pod Hostname:</strong> <span id="hostname">Loading...</span></p>
+                <p><strong>Server:</strong> Nginx/1.25+</p>
+                <p><strong>Load Balanced:</strong> Yes (3 replicas)</p>
+            </div>
+            
+            <p style="margin-top: 2rem; font-size: 0.9rem; opacity: 0.8;">
+                🎯 This application demonstrates a complete EKS deployment with Terraform-managed infrastructure,
+                custom namespace isolation, and production-ready configuration.
+            </p>
+        </div>
+
+        <script>
+            // Set current timestamp
+            document.getElementById('timestamp').textContent = new Date().toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            // Get hostname (will show the actual pod name when deployed)
+            fetch('/hostname')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('hostname').textContent = data.trim();
+                })
+                .catch(error => {
+                    // Fallback if endpoint not available
+                    document.getElementById('hostname').textContent = window.location.hostname || 'sample-web-app-pod';
+                });
+        </script>
+    </body>
+    </html>
+---

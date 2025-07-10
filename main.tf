@@ -1,72 +1,19 @@
 # Configure the AWS Provider
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-  required_version = ">= 1.0"
-}
-
 provider "aws" {
   region = var.aws_region
 }
 
-# Variables
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "ap-south-1"
-}
-
-variable "cluster_name" {
-  description = "EKS cluster name"
-  type        = string
-  default     = "altimetrik-eks-cluster"
-}
-
-variable "cluster_version" {
-  description = "EKS cluster version"
-  type        = string
-  default     = "1.28"
-}
-
-variable "key_pair_name" {
-  description = "Name of existing EC2 Key Pair (without .pem extension)"
-  type        = string
-  default     = "python"
-}
-
-variable "web_server_instance_type" {
-  d# Application Load Balancer for Web Serversce type for web servers"
-  type        = string
-  default     = "t2.micro"
-}
-
-variable "app_server_instance_type" {
-  description = "Instance type for app servers"
-  type        = string
-  default     = "t2.micro"
-}
-
-# Data sources
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-data "aws_caller_identity" "current" {}
-
 # VPC Configuration
 resource "aws_vpc" "eks_vpc" {
   cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  enable_dns_hostnames = true # Enable DNS hostnames for the VPC
+  enable_dns_support   = true # Enable DNS support for the VPC
 
-  tags = {
-    Name                                        = "${var.cluster_name}-vpc"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+  tags = merge(local.common_tags, local.eks_tags, {
+    Name = "${var.cluster_name}-vpc"
+  })
+
+
 }
 
 # Internet Gateway
@@ -80,37 +27,33 @@ resource "aws_internet_gateway" "eks_igw" {
 
 # Public Subnets (for ALB)
 resource "aws_subnet" "public_subnets" {
-  count             = 3
+  count             = 2
   vpc_id            = aws_vpc.eks_vpc.id
   cidr_block        = "10.0.${count.index + 1}.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   map_public_ip_on_launch = true
 
-  tags = {
-    Name                                        = "${var.cluster_name}-public-subnet-${count.index + 1}"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                    = "1"
-  }
+  tags = merge(local.common_tags, local.eks_tags, local.public_subnet_tags, {
+    Name = "${var.cluster_name}-public-subnet-${count.index + 1}"
+  })
 }
 
 # Private Subnets (for EKS nodes)
 resource "aws_subnet" "private_subnets" {
-  count             = 3
+  count             = 2
   vpc_id            = aws_vpc.eks_vpc.id
   cidr_block        = "10.0.${count.index + 10}.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
-  tags = {
-    Name                                        = "${var.cluster_name}-private-subnet-${count.index + 1}"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/internal-elb"           = "1"
-  }
+  tags = merge(local.common_tags, local.eks_tags, local.private_subnet_tags, {
+    Name = "${var.cluster_name}-private-subnet-${count.index + 1}"
+  })
 }
 
 # NAT Gateway for private subnets
 resource "aws_eip" "nat_eips" {
-  count  = 3
+  count  = 2
   domain = "vpc"
 
   tags = {
@@ -121,7 +64,7 @@ resource "aws_eip" "nat_eips" {
 }
 
 resource "aws_nat_gateway" "nat_gateways" {
-  count         = 3
+  count         = 2
   allocation_id = aws_eip.nat_eips[count.index].id
   subnet_id     = aws_subnet.public_subnets[count.index].id
 
@@ -147,7 +90,7 @@ resource "aws_route_table" "public_rt" {
 }
 
 resource "aws_route_table" "private_rt" {
-  count  = 3
+  count  = 2
   vpc_id = aws_vpc.eks_vpc.id
 
   route {
@@ -162,13 +105,13 @@ resource "aws_route_table" "private_rt" {
 
 # Route Table Associations
 resource "aws_route_table_association" "public_rta" {
-  count          = 3
+  count          = 2
   subnet_id      = aws_subnet.public_subnets[count.index].id
   route_table_id = aws_route_table.public_rt.id
 }
 
 resource "aws_route_table_association" "private_rta" {
-  count          = 3
+  count          = 2
   subnet_id      = aws_subnet.private_subnets[count.index].id
   route_table_id = aws_route_table.private_rt[count.index].id
 }
@@ -178,6 +121,15 @@ resource "aws_security_group" "eks_cluster_sg" {
   name        = "${var.cluster_name}-cluster-sg"
   description = "Security group for EKS cluster"
   vpc_id      = aws_vpc.eks_vpc.id
+
+  # Allow HTTPS access to EKS API from anywhere (for public endpoint)
+  ingress {
+    description = "HTTPS API access"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   egress {
     from_port   = 0
@@ -196,20 +148,51 @@ resource "aws_security_group" "eks_node_sg" {
   description = "Security group for EKS nodes"
   vpc_id      = aws_vpc.eks_vpc.id
 
+  # Kubelet API from cluster control plane
   ingress {
-    from_port = 0
-    to_port   = 65535
-    protocol  = "tcp"
-    self      = true
+    description     = "Kubelet API"
+    from_port       = 10250
+    to_port         = 10250
+    protocol        = "tcp"
+    security_groups = [aws_security_group.eks_cluster_sg.id]
   }
 
+  # Node to node communication for cluster networking
   ingress {
+    description = "Node to node communication"
+    from_port   = 1025
+    to_port     = 65535
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # HTTPS communication from cluster control plane
+  ingress {
+    description     = "HTTPS from cluster control plane"
     from_port       = 443
     to_port         = 443
     protocol        = "tcp"
     security_groups = [aws_security_group.eks_cluster_sg.id]
   }
 
+  # DNS resolution
+  ingress {
+    description = "DNS TCP"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "DNS UDP"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    self        = true
+  }
+
+  # Allow all outbound traffic (nodes need internet access for pulling images, etc.)
   egress {
     from_port   = 0
     to_port     = 0
@@ -249,7 +232,7 @@ resource "aws_security_group" "web_server_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting this to your IP for security
+    cidr_blocks = ["0.0.0.0/0"] # Consider restricting this to your IP for security
   }
 
   egress {
@@ -272,7 +255,7 @@ resource "aws_security_group" "app_server_sg" {
 
   ingress {
     description     = "HTTP from Web Servers"
-    from_port       = 8080
+    from_port       = 8080 # Assuming app servers listen on port 8080
     to_port         = 8080
     protocol        = "tcp"
     security_groups = [aws_security_group.web_server_sg.id]
@@ -280,7 +263,7 @@ resource "aws_security_group" "app_server_sg" {
 
   ingress {
     description     = "HTTPS from Web Servers"
-    from_port       = 8443
+    from_port       = 8443 # Assuming app servers listen on port 8443
     to_port         = 8443
     protocol        = "tcp"
     security_groups = [aws_security_group.web_server_sg.id]
@@ -294,10 +277,45 @@ resource "aws_security_group" "app_server_sg" {
     security_groups = [aws_security_group.web_server_sg.id]
   }
 
+  # Allow specific inter-app server communication
   ingress {
-    description = "All traffic from same security group"
-    from_port   = 0
-    to_port     = 65535
+    description = "App-to-app HTTP communication"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "App-to-app HTTPS communication"
+    from_port   = 8443
+    to_port     = 8443
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # Database communication (if using MySQL/PostgreSQL between app servers)
+  ingress {
+    description = "Database communication"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "PostgreSQL communication"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    self        = true
+  }
+
+  # Redis/Cache communication
+  ingress {
+    description = "Redis communication"
+    from_port   = 6379
+    to_port     = 6379
     protocol    = "tcp"
     self        = true
   }
@@ -354,16 +372,19 @@ resource "aws_iam_role" "eks_node_role" {
   })
 }
 
+# Attach necessary policies to the EKS Node Role
 resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.eks_node_role.name
 }
 
+# Attach additional policies for EKS Node Role
 resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
   role       = aws_iam_role.eks_node_role.name
 }
 
+# Attach AmazonEC2ContainerRegistryReadOnly policy to allow EKS nodes to pull images from ECR
 resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_node_role.name
@@ -388,6 +409,13 @@ resource "aws_eks_cluster" "eks_cluster" {
     aws_iam_role_policy_attachment.eks_cluster_policy,
   ]
 
+  lifecycle {
+    ignore_changes = [
+      # Ignore changes to tags that might be modified by AWS or other tools
+      tags
+    ]
+  }
+
   tags = {
     Name = var.cluster_name
   }
@@ -408,7 +436,7 @@ resource "aws_eks_node_group" "eks_nodes" {
   }
 
   update_config {
-    max_unavailable = 1
+    max_unavailable = 1 # Allow one node to be unavailable during updates
   }
 
   # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
@@ -420,6 +448,13 @@ resource "aws_eks_node_group" "eks_nodes" {
 
   tags = {
     Name = "${var.cluster_name}-nodes"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # Allow scaling changes without triggering replacement
+      scaling_config[0].desired_size
+    ]
   }
 }
 
@@ -448,18 +483,14 @@ resource "aws_iam_role" "aws_load_balancer_controller" {
 }
 
 # OIDC Provider for EKS
-data "tls_certificate" "eks" {
-  url = aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer
-}
-
 resource "aws_iam_openid_connect_provider" "eks" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
   url             = aws_eks_cluster.eks_cluster.identity[0].oidc[0].issuer
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.cluster_name}-eks-irsa"
-  }
+  })
 }
 
 # AWS Load Balancer Controller Policy
@@ -589,7 +620,7 @@ resource "aws_iam_policy" "aws_load_balancer_controller" {
         ]
         Condition = {
           Null = {
-            "aws:RequestedRegion" = "false"
+            "aws:RequestedRegion"                   = "false"
             "aws:ResourceTag/elbv2.k8s.aws/cluster" = "false"
           }
         }
@@ -652,27 +683,6 @@ resource "aws_iam_policy" "aws_load_balancer_controller" {
 resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
   policy_arn = aws_iam_policy.aws_load_balancer_controller.arn
   role       = aws_iam_role.aws_load_balancer_controller.name
-}
-
-# Data source for existing key pair
-data "aws_key_pair" "existing_key_pair" {
-  key_name = var.key_pair_name
-}
-
-# Data source for latest Amazon Linux 2 AMI
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
 }
 
 # Web Server 1 (Public Subnet)
@@ -817,125 +827,3 @@ resource "aws_lb_listener" "web_listener" {
   }
 }
 
-# Additional Variables for EC2 instances
-variable "public_key" {
-  description = "Public key for EC2 instances"
-  type        = string
-  default     = ""  # You need to provide your public key here
-}
-
-variable "web_server_instance_type" {
-  description = "Instance type for web servers"
-  type        = string
-  default     = "t2.micro"
-}
-
-variable "app_server_instance_type" {
-  description = "Instance type for app servers"
-  type        = string
-  default     = "t2.micro"
-}
-
-# Outputs
-output "cluster_endpoint" {
-  description = "Endpoint for EKS control plane"
-  value       = aws_eks_cluster.eks_cluster.endpoint
-}
-
-output "cluster_security_group_id" {
-  description = "Security group ids attached to the cluster control plane"
-  value       = aws_eks_cluster.eks_cluster.vpc_config[0].cluster_security_group_id
-}
-
-output "cluster_iam_role_name" {
-  description = "IAM role name associated with EKS cluster"
-  value       = aws_iam_role.eks_cluster_role.name
-}
-
-output "cluster_certificate_authority_data" {
-  description = "Base64 encoded certificate data required to communicate with the cluster"
-  value       = aws_eks_cluster.eks_cluster.certificate_authority[0].data
-}
-
-output "cluster_name" {
-  description = "The name/id of the EKS cluster"
-  value       = aws_eks_cluster.eks_cluster.name
-}
-
-output "node_group_arn" {
-  description = "Amazon Resource Name (ARN) of the EKS Node Group"
-  value       = aws_eks_node_group.eks_nodes.arn
-}
-
-output "aws_load_balancer_controller_role_arn" {
-  description = "ARN of the AWS Load Balancer Controller IAM role"
-  value       = aws_iam_role.aws_load_balancer_controller.arn
-}
-
-output "vpc_id" {
-  description = "ID of the VPC where the cluster security group is"
-  value       = aws_vpc.eks_vpc.id
-}
-
-output "private_subnets" {
-  description = "List of IDs of private subnets"
-  value       = aws_subnet.private_subnets[*].id
-}
-
-output "public_subnets" {
-  description = "List of IDs of public subnets"
-  value       = aws_subnet.public_subnets[*].id
-}
-
-# Web Server Outputs
-output "web_server_1_public_ip" {
-  description = "Public IP of Web Server 1"
-  value       = aws_instance.web_server_1.public_ip
-}
-
-output "web_server_2_public_ip" {
-  description = "Public IP of Web Server 2"
-  value       = aws_instance.web_server_2.public_ip
-}
-
-output "web_server_1_private_ip" {
-  description = "Private IP of Web Server 1"
-  value       = aws_instance.web_server_1.private_ip
-}
-
-output "web_server_2_private_ip" {
-  description = "Private IP of Web Server 2"
-  value       = aws_instance.web_server_2.private_ip
-}
-
-# App Server Outputs
-output "app_server_1_private_ip" {
-  description = "Private IP of App Server 1"
-  value       = aws_instance.app_server_1.private_ip
-}
-
-output "app_server_2_private_ip" {
-  description = "Private IP of App Server 2"
-  value       = aws_instance.app_server_2.private_ip
-}
-
-# Load Balancer Output
-output "web_alb_dns_name" {
-  description = "DNS name of the Web Application Load Balancer"
-  value       = aws_lb.web_alb.dns_name
-}
-
-output "web_alb_zone_id" {
-  description = "Zone ID of the Web Application Load Balancer"
-  value       = aws_lb.web_alb.zone_id
-}
-
-output "key_pair_name" {
-  description = "Name of the EC2 Key Pair being used"
-  value       = data.aws_key_pair.existing_key_pair.key_name
-}
-
-output "region" {
-  description = "AWS region where resources are deployed"
-  value       = var.aws_region
-}

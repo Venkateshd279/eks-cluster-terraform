@@ -19,7 +19,7 @@ cat > /var/www/html/index.html << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Altimetrik Web Server</title>
+    <title>Web Server</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f4; }
         .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -31,7 +31,7 @@ cat > /var/www/html/index.html << 'EOF'
 </head>
 <body>
     <div class="container">
-        <h1>🌐 Altimetrik Web Server</h1>
+        <h1>🌐 Web Server</h1>
         <div class="info">
             <strong>Server Info:</strong><br>
             Instance ID: <span id="instance-id">Loading...</span><br>
