@@ -695,7 +695,7 @@ resource "aws_instance" "web_server_1" {
 
   associate_public_ip_address = true
 
-  user_data = base64encode(templatefile("${path.module}/scripts/web_server_userdata.sh", {
+  user_data = base64encode(templatefile("${path.module}/../scripts/web_server_userdata.sh", {
     app_server_1_ip = aws_instance.app_server_1.private_ip
     app_server_2_ip = aws_instance.app_server_2.private_ip
   }))
@@ -718,7 +718,7 @@ resource "aws_instance" "web_server_2" {
 
   associate_public_ip_address = true
 
-  user_data = base64encode(templatefile("${path.module}/scripts/web_server_userdata.sh", {
+  user_data = base64encode(templatefile("${path.module}/../scripts/web_server_userdata.sh", {
     app_server_1_ip = aws_instance.app_server_1.private_ip
     app_server_2_ip = aws_instance.app_server_2.private_ip
   }))
@@ -739,7 +739,7 @@ resource "aws_instance" "app_server_1" {
   vpc_security_group_ids = [aws_security_group.app_server_sg.id]
   subnet_id              = aws_subnet.private_subnets[0].id
 
-  user_data = base64encode(file("${path.module}/scripts/app_server_userdata.sh"))
+  user_data = base64encode(file("${path.module}/../scripts/app_server_userdata.sh"))
 
   tags = {
     Name = "${var.cluster_name}-app-server-1"
@@ -755,7 +755,7 @@ resource "aws_instance" "app_server_2" {
   vpc_security_group_ids = [aws_security_group.app_server_sg.id]
   subnet_id              = aws_subnet.private_subnets[1].id
 
-  user_data = base64encode(file("${path.module}/scripts/app_server_userdata.sh"))
+  user_data = base64encode(file("${path.module}/../scripts/app_server_userdata.sh"))
 
   tags = {
     Name = "${var.cluster_name}-app-server-2"

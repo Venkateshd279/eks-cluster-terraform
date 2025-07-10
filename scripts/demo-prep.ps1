@@ -96,7 +96,7 @@ try {
 
 # 7. Check architecture diagram
 if (-not (Test-Component "Architecture Diagram" {
-    Test-Path "EKS_Architecture_Diagram.png"
+    Test-Path "docs\diagrams\EKS_Architecture_Diagram.png"
 } "Architecture diagram ready for presentation" "Architecture diagram not found")) {
     $ErrorCount++
 }
@@ -123,10 +123,10 @@ if ($ErrorCount -eq 0) {
     Write-Host "🎉 ALL SYSTEMS READY FOR DEMO!" -ForegroundColor Green
     Write-Host ""
     Write-Host "📋 Demo Assets:" -ForegroundColor Cyan
-    Write-Host "  • Architecture Diagram: EKS_Architecture_Diagram.png" -ForegroundColor White
+    Write-Host "  • Architecture Diagram: docs\diagrams\EKS_Architecture_Diagram.png" -ForegroundColor White
     Write-Host "  • Customer URL: $albDns" -ForegroundColor White
     Write-Host "  • Jenkins URL: http://${jenkinsIp}:8080" -ForegroundColor White
-    Write-Host "  • Demo Guide: DEMO_GUIDE_FOR_MANAGER.md" -ForegroundColor White
+    Write-Host "  • Demo Guide: docs\DEMO_GUIDE_FOR_MANAGER.md" -ForegroundColor White
     Write-Host ""
     Write-Host "🎯 You're ready to impress your manager!" -ForegroundColor Green
 } else {
@@ -140,7 +140,7 @@ if ($ErrorCount -eq 0) {
 
 Write-Host ""
 Write-Host "📖 Next Steps:" -ForegroundColor Cyan
-Write-Host "  1. Review DEMO_GUIDE_FOR_MANAGER.md" -ForegroundColor White
+Write-Host "  1. Review docs\DEMO_GUIDE_FOR_MANAGER.md" -ForegroundColor White
 Write-Host "  2. Practice the demo script" -ForegroundColor White
 Write-Host "  3. Open architecture diagram for presentation" -ForegroundColor White
 Write-Host "  4. Prepare for Q&A using the guide" -ForegroundColor White

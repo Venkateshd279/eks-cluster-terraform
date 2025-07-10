@@ -140,7 +140,7 @@ resource "aws_iam_instance_profile" "jenkins_profile" {
 
 # User data script for Jenkins setup on Ubuntu
 locals {
-  jenkins_user_data = base64encode(templatefile("${path.module}/cicd/jenkins/jenkins-setup-ubuntu.sh", {
+  jenkins_user_data = base64encode(templatefile("${path.module}/../cicd/jenkins/jenkins-setup-ubuntu.sh", {
     cluster_name = var.cluster_name
     region       = var.aws_region
   }))

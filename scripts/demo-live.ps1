@@ -20,7 +20,7 @@ function Show-Step {
 
 function Show-Architecture {
     Show-Step "1. ARCHITECTURE OVERVIEW" "Opening architecture diagram..."
-    Start-Process "EKS_Architecture_Diagram.png"
+    Start-Process "docs\diagrams\EKS_Architecture_Diagram.png"
     Write-Host "✅ Architecture diagram opened" -ForegroundColor Green
     Write-Host "💬 Talking points:" -ForegroundColor Cyan
     Write-Host "  • Multi-AZ deployment for high availability" -ForegroundColor White

@@ -1,4 +1,25 @@
-# EKS Cluster with Web Servers, App Servers, and Application Load Balancer
+﻿# EKS Cluster with Web Servers, App Servers, and Application Load Balancer
+
+## 📁 Project Structure
+
+```
+eks-cluster-terraform/
+├── terraform/                 # 🏗️ All Terraform infrastructure files
+│   ├── main.tf               # Main configuration
+│   ├── variables.tf          # Variables
+│   └── README.md             # Terraform-specific documentation
+├── scripts/                   # 🔧 Utility and demo scripts
+├── k8s-apps/                  # ☸️ Kubernetes applications
+├── cicd/                      # 🚀 CI/CD pipeline configuration
+├── docs/                      # 📚 Architecture and demo guides
+└── README.md                  # This file
+```
+
+**Quick Start:**
+1. `cd terraform && terraform init && terraform apply`
+2. Run demo: `.\scripts\demo-live.ps1`
+3. Access app: Check `CUSTOMER_ACCESS_ARCHITECTURE.md`
+
 
 ## 🔒 SECURITY WARNING - READ BEFORE PUSHING TO GITHUB
 
@@ -455,3 +476,4 @@ For issues or questions, refer to:
 - [AWS EKS Documentation](https://docs.aws.amazon.com/eks/)
 - [AWS Load Balancer Controller Documentation](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
 - [Terraform AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+
