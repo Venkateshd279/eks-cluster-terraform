@@ -1,3 +1,6 @@
+# Fixed Dockerfile - Copy this content to Jenkins server
+# Replace the entire Dockerfile with this content
+
 # Multi-stage build for optimized image
 FROM node:18-alpine AS builder
 
