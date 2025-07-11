@@ -11,6 +11,9 @@ WORKDIR /app
 # Production stage
 FROM nginx:alpine
 
+# Remove default nginx configuration
+RUN rm -f /etc/nginx/conf.d/default.conf
+
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
@@ -27,7 +30,9 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/run/nginx && \
     # Create log directory
     touch /var/log/nginx/access.log /var/log/nginx/error.log && \
-    chown nginx:nginx /var/log/nginx/access.log /var/log/nginx/error.log
+    chown nginx:nginx /var/log/nginx/access.log /var/log/nginx/error.log && \
+    # Remove default nginx config that might override our PID setting
+    rm -f /etc/nginx/nginx.conf.default
 
 # Switch to non-root user
 USER nginx
