@@ -21,49 +21,24 @@ pipeline {
         
         // SNS Notification Configuration
         SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:897722681721:jenkins-pipeline-notifications'
-        
-        // Test Configuration - Choose failure type
-        FAILURE_TYPE = "${params.FAILURE_TYPE ?: 'DOCKER_BUILD'}"
-    }
-    
-    parameters {
-        choice(
-            name: 'FAILURE_TYPE',
-            choices: [
-                'DOCKER_BUILD',
-                'ECR_PUSH',
-                'KUBERNETES_DEPLOY',
-                'ENVIRONMENT_SETUP',
-                'MANIFEST_UPDATE',
-                'TIMEOUT_FAILURE',
-                'SYNTAX_ERROR'
-            ],
-            description: 'Select the type of failure to simulate for testing notifications'
-        )
-        booleanParam(
-            name: 'SEND_SUCCESS_NOTIFICATION',
-            defaultValue: false,
-            description: 'Send notification on success (for testing success notifications)'
-        )
     }
     
     stages {
-        stage('Test Setup') {
+        stage('Checkout') {
             steps {
-                echo '🧪 Setting up failure test environment...'
+                echo '🔄 Checking out source code...'
+                // Code is automatically checked out by Jenkins
                 script {
-                    echo "📋 Test Configuration:"
-                    echo "Failure Type: ${env.FAILURE_TYPE}"
-                    echo "SNS Topic: ${env.SNS_TOPIC_ARN}"
-                    echo "Send Success Notification: ${params.SEND_SUCCESS_NOTIFICATION}"
-                    
                     // Get git commit info for tagging
                     env.GIT_COMMIT_SHORT = sh(
                         script: "git rev-parse --short HEAD",
                         returnStdout: true
                     ).trim()
-                    env.IMAGE_TAG = "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}-test"
+                    env.IMAGE_TAG = "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
                 }
+                echo "📋 Build Number: ${BUILD_NUMBER}"
+                echo "📋 Git Commit: ${GIT_COMMIT_SHORT}"
+                echo "📋 Image Tag: ${IMAGE_TAG}"
             }
         }
         
@@ -71,245 +46,227 @@ pipeline {
             steps {
                 echo '⚙️ Setting up environment...'
                 script {
-                    if (env.FAILURE_TYPE == 'ENVIRONMENT_SETUP') {
-                        echo '💥 Simulating environment setup failure...'
-                        sh '''
-                            echo "❌ Simulated failure: Unable to configure AWS CLI"
-                            echo "This would typically happen when:"
-                            echo "- AWS credentials are missing or invalid"
-                            echo "- Network connectivity issues"
-                            echo "- IAM permissions are insufficient"
-                            exit 1
-                        '''
-                    } else {
-                        sh '''
-                            echo "Checking tools..."
-                            aws --version
-                            kubectl version --client
-                            docker --version
-                            
-                            echo "Configuring AWS CLI..."
-                            aws configure set region $AWS_REGION
-                            aws configure set output json
-                            
-                            echo "Current AWS Identity:"
-                            aws sts get-caller-identity
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Syntax Error Test') {
-            when {
-                environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR'
-            }
-            steps {
-                echo '💥 Simulating syntax error...'
-                script {
                     sh '''
-                        echo "❌ Simulated failure: Script syntax error"
-                        echo "This would typically happen when:"
-                        echo "- Invalid shell commands"
-                        echo "- Missing quotes or brackets"
-                        echo "- Undefined variables"
-                        # Intentional syntax error
-                        invalid_command_that_does_not_exist --with-invalid-flags
+                        echo "Checking tools..."
+                        aws --version
+                        kubectl version --client
+                        docker --version
+                        
+                        echo "Configuring AWS CLI..."
+                        aws configure set region $AWS_REGION
+                        aws configure set output json
+                        
+                        echo "Current AWS Identity:"
+                        aws sts get-caller-identity
                     '''
                 }
             }
         }
         
-        stage('Docker Build Test') {
-            when {
-                not { environment name: 'FAILURE_TYPE', value: 'ENVIRONMENT_SETUP' }
-                not { environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR' }
-            }
+        stage('Create ECR Repository') {
             steps {
-                echo '🐳 Testing Docker build...'
-                script {
-                    if (env.FAILURE_TYPE == 'DOCKER_BUILD') {
-                        echo '💥 Simulating Docker build failure...'
-                        sh '''
-                            echo "❌ Simulated failure: Docker build failed"
-                            echo "This would typically happen when:"
-                            echo "- Dockerfile syntax errors"
-                            echo "- Missing base image"
-                            echo "- Network issues downloading dependencies"
-                            echo "- Insufficient disk space"
-                            echo "- Permission issues with Docker daemon"
-                            exit 1
-                        '''
-                    } else {
-                        dir(K8S_MANIFESTS_PATH) {
-                            sh '''
-                                echo "Building Docker image..."
-                                docker build -t $APP_NAME:$IMAGE_TAG .
-                                docker tag $APP_NAME:$IMAGE_TAG $IMAGE_REPO:$IMAGE_TAG
-                                echo "✅ Docker build successful"
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('ECR Push Test') {
-            when {
-                not { anyOf {
-                    environment name: 'FAILURE_TYPE', value: 'ENVIRONMENT_SETUP'
-                    environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR'
-                    environment name: 'FAILURE_TYPE', value: 'DOCKER_BUILD'
-                } }
-            }
-            steps {
-                echo '⬆️ Testing ECR push...'
-                script {
-                    if (env.FAILURE_TYPE == 'ECR_PUSH') {
-                        echo '💥 Simulating ECR push failure...'
-                        sh '''
-                            echo "❌ Simulated failure: ECR push failed"
-                            echo "This would typically happen when:"
-                            echo "- ECR authentication failure"
-                            echo "- Repository doesn't exist"
-                            echo "- Network connectivity issues"
-                            echo "- IAM permissions insufficient"
-                            echo "- Registry quota exceeded"
-                            exit 1
-                        '''
-                    } else {
-                        sh '''
-                            echo "Logging in to ECR..."
-                            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-                            
-                            echo "Pushing Docker image to ECR..."
-                            docker push $IMAGE_REPO:$IMAGE_TAG
-                            echo "✅ ECR push successful"
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Manifest Update Test') {
-            when {
-                not { anyOf {
-                    environment name: 'FAILURE_TYPE', value: 'ENVIRONMENT_SETUP'
-                    environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR'
-                    environment name: 'FAILURE_TYPE', value: 'DOCKER_BUILD'
-                    environment name: 'FAILURE_TYPE', value: 'ECR_PUSH'
-                } }
-            }
-            steps {
-                echo '📝 Testing manifest update...'
-                script {
-                    if (env.FAILURE_TYPE == 'MANIFEST_UPDATE') {
-                        echo '💥 Simulating manifest update failure...'
-                        sh '''
-                            echo "❌ Simulated failure: Manifest update failed"
-                            echo "This would typically happen when:"
-                            echo "- File permissions issues"
-                            echo "- Invalid file paths"
-                            echo "- Git repository issues"
-                            echo "- Disk space problems"
-                            exit 1
-                        '''
-                    } else {
-                        dir(K8S_MANIFESTS_PATH) {
-                            sh '''
-                                echo "Updating Kubernetes manifests..."
-                                sed -i "s|image: .*ecr.*amazonaws.com/sample-web-app:.*|image: $IMAGE_REPO:$IMAGE_TAG|g" deployment-ecr.yaml
-                                echo "✅ Manifest update successful"
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Kubernetes Deploy Test') {
-            when {
-                not { anyOf {
-                    environment name: 'FAILURE_TYPE', value: 'ENVIRONMENT_SETUP'
-                    environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR'
-                    environment name: 'FAILURE_TYPE', value: 'DOCKER_BUILD'
-                    environment name: 'FAILURE_TYPE', value: 'ECR_PUSH'
-                    environment name: 'FAILURE_TYPE', value: 'MANIFEST_UPDATE'
-                } }
-            }
-            steps {
-                echo '🚀 Testing Kubernetes deployment...'
-                script {
-                    if (env.FAILURE_TYPE == 'KUBERNETES_DEPLOY') {
-                        echo '💥 Simulating Kubernetes deployment failure...'
-                        sh '''
-                            echo "❌ Simulated failure: Kubernetes deployment failed"
-                            echo "This would typically happen when:"
-                            echo "- EKS cluster connectivity issues"
-                            echo "- kubectl authentication failure"
-                            echo "- Invalid Kubernetes manifests"
-                            echo "- Resource quota exceeded"
-                            echo "- Image pull errors"
-                            echo "- Network policies blocking traffic"
-                            exit 1
-                        '''
-                    } else {
-                        sh '''
-                            echo "Configuring EKS access..."
-                            aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
-                            
-                            echo "Deploying to Kubernetes..."
-                            kubectl get nodes
-                            echo "✅ Kubernetes deployment test successful"
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Timeout Test') {
-            when {
-                environment name: 'FAILURE_TYPE', value: 'TIMEOUT_FAILURE'
-            }
-            timeout(time: 10, unit: 'SECONDS') {
-                steps {
-                    echo '⏰ Testing timeout failure...'
-                    script {
-                        sh '''
-                            echo "💥 Simulating timeout failure..."
-                            echo "This test will timeout after 10 seconds"
-                            echo "This would typically happen when:"
-                            echo "- Deployment rollout takes too long"
-                            echo "- Health checks failing"
-                            echo "- Network issues causing delays"
-                            echo "- Resource constraints"
-                            echo "Starting long-running process..."
-                            sleep 20  # This will timeout
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Success Simulation') {
-            when {
-                not { anyOf {
-                    environment name: 'FAILURE_TYPE', value: 'ENVIRONMENT_SETUP'
-                    environment name: 'FAILURE_TYPE', value: 'SYNTAX_ERROR'
-                    environment name: 'FAILURE_TYPE', value: 'DOCKER_BUILD'
-                    environment name: 'FAILURE_TYPE', value: 'ECR_PUSH'
-                    environment name: 'FAILURE_TYPE', value: 'MANIFEST_UPDATE'
-                    environment name: 'FAILURE_TYPE', value: 'KUBERNETES_DEPLOY'
-                    environment name: 'FAILURE_TYPE', value: 'TIMEOUT_FAILURE'
-                } }
-            }
-            steps {
-                echo '✅ All tests passed - simulating successful pipeline'
+                echo '📦 Creating ECR repository if it doesn\'t exist...'
                 script {
                     sh '''
-                        echo "🎉 All pipeline stages completed successfully!"
-                        echo "This pipeline run will trigger a success notification"
-                        echo "if SEND_SUCCESS_NOTIFICATION is enabled"
+                        echo "Checking if ECR repository exists..."
+                        
+                        # Check if repository exists, create if not
+                        if aws ecr describe-repositories --repository-names $APP_NAME --region $AWS_REGION >/dev/null 2>&1; then
+                            echo "✅ ECR repository '$APP_NAME' already exists"
+                        else
+                            echo "📦 Creating ECR repository '$APP_NAME'..."
+                            aws ecr create-repository --repository-name $APP_NAME --region $AWS_REGION
+                            echo "✅ ECR repository created successfully"
+                        fi
+                        
+                        echo "📋 ECR Repository URI: $IMAGE_REPO"
+                        
+                        # Set lifecycle policy to manage image retention
+                        aws ecr put-lifecycle-policy --repository-name $APP_NAME --region $AWS_REGION --lifecycle-policy-text '{
+                            "rules": [
+                                {
+                                    "rulePriority": 1,
+                                    "description": "Keep last 10 images",
+                                    "selection": {
+                                        "tagStatus": "tagged",
+                                        "countType": "imageCountMoreThan",
+                                        "countNumber": 10
+                                    },
+                                    "action": {
+                                        "type": "expire"
+                                    }
+                                }
+                            ]
+                        }' || echo "⚠️ Lifecycle policy already exists or failed to set"
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                echo '🐳 Building Docker image...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            echo "Building Docker image..."
+                            docker build -t $APP_NAME:$IMAGE_TAG .
+                            docker tag $APP_NAME:$IMAGE_TAG $IMAGE_REPO:$IMAGE_TAG
+                            docker tag $APP_NAME:$IMAGE_TAG $IMAGE_REPO:latest
+                            
+                            echo "Docker images built:"
+                            docker images | grep $APP_NAME
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Push to ECR') {
+            steps {
+                echo '⬆️ Pushing image to ECR...'
+                script {
+                    sh '''
+                        echo "Logging in to ECR..."
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                        
+                        if [ $? -eq 0 ]; then
+                            echo "✅ ECR login successful"
+                        else
+                            echo "❌ ECR login failed"
+                            exit 1
+                        fi
+                        
+                        echo "Pushing Docker image to ECR..."
+                        docker push $IMAGE_REPO:$IMAGE_TAG
+                        docker push $IMAGE_REPO:latest
+                        
+                        echo "✅ Image pushed successfully!"
+                        echo "📋 Image URI: $IMAGE_REPO:$IMAGE_TAG"
+                        echo "📋 Latest URI: $IMAGE_REPO:latest"
+                        
+                        # Verify image exists in ECR
+                        aws ecr describe-images --repository-name $APP_NAME --region $AWS_REGION --image-ids imageTag=$IMAGE_TAG
+                    '''
+                }
+            }
+        }
+        
+        stage('Update Kubernetes Manifests') {
+            steps {
+                echo '📝 Updating Kubernetes manifests...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            # Update deployment-ecr.yaml with new image
+                            echo "Current image in deployment-ecr.yaml:"
+                            grep "image:" deployment-ecr.yaml
+                            
+                            # Update with the new image tag
+                            sed -i "s|image: .*ecr.*amazonaws.com/sample-web-app:.*|image: $IMAGE_REPO:$IMAGE_TAG|g" deployment-ecr.yaml
+                            
+                            echo "Updated deployment-ecr.yaml:"
+                            grep "image:" deployment-ecr.yaml
+                            
+                            # Verify the change was applied
+                            if grep -q "$IMAGE_REPO:$IMAGE_TAG" deployment-ecr.yaml; then
+                                echo "✅ Image successfully updated in deployment-ecr.yaml"
+                            else
+                                echo "❌ Failed to update image in deployment-ecr.yaml"
+                                exit 1
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Configure EKS Access') {
+            steps {
+                echo '🔐 Configuring EKS access...'
+                script {
+                    sh '''
+                        echo "Updating kubeconfig for EKS cluster..."
+                        aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+                        
+                        echo "Verifying kubectl access..."
+                        kubectl cluster-info
+                        kubectl get nodes
+                    '''
+                }
+            }
+        }
+        
+        stage('Deploy to EKS') {
+            steps {
+                echo '🚀 Deploying to EKS cluster...'
+                script {
+                    dir(K8S_MANIFESTS_PATH) {
+                        sh '''
+                            echo "Applying Kubernetes manifests..."
+                            
+                            # Apply manifests in order
+                            kubectl apply -f namespace.yaml
+                            kubectl apply -f configmap.yaml
+                            kubectl apply -f deployment-ecr.yaml
+                            kubectl apply -f service.yaml
+                            kubectl apply -f ingress.yaml
+                            
+                            echo "Deployment completed!"
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Wait for Deployment') {
+            steps {
+                echo '⏳ Waiting for deployment to be ready...'
+                script {
+                    sh '''
+                        echo "Waiting for deployment rollout..."
+                        kubectl rollout status deployment/$APP_NAME -n $NAMESPACE --timeout=300s
+                        
+                        echo "Checking pod status..."
+                        kubectl get pods -n $NAMESPACE -l app=$APP_NAME
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                echo '✅ Verifying deployment...'
+                script {
+                    sh '''
+                        echo "Getting deployment information..."
+                        kubectl get all -n $NAMESPACE -l app=$APP_NAME
+                        
+                        echo "Checking service endpoints..."
+                        kubectl get svc -n $NAMESPACE
+                        
+                        echo "Checking ingress..."
+                        kubectl get ingress -n $NAMESPACE
+                        
+                        # Get LoadBalancer URL if available
+                        LB_URL=$(kubectl get ingress -n $NAMESPACE -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "LoadBalancer not ready yet")
+                        echo "Application URL: http://$LB_URL"
+                    '''
+                }
+            }
+        }
+        
+        stage('Cleanup') {
+            steps {
+                echo '🧹 Cleaning up local Docker images...'
+                script {
+                    sh '''
+                        echo "Removing local Docker images..."
+                        docker rmi $APP_NAME:$IMAGE_TAG || true
+                        docker rmi $IMAGE_REPO:$IMAGE_TAG || true
+                        docker rmi $IMAGE_REPO:latest || true
+                        
+                        echo "Cleanup completed!"
                     '''
                 }
             }
@@ -318,81 +275,85 @@ pipeline {
     
     post {
         always {
-            echo '📊 Test pipeline execution completed!'
+            echo '📊 Pipeline execution completed!'
             script {
                 sh '''
                     echo "==================================="
-                    echo "Test Pipeline Summary"
+                    echo "Pipeline Summary"
                     echo "==================================="
-                    echo "Failure Type: $FAILURE_TYPE"
                     echo "Application: $APP_NAME"
+                    echo "Namespace: $NAMESPACE"
+                    echo "Image: $IMAGE_REPO:$IMAGE_TAG"
                     echo "Build: $BUILD_NUMBER"
                     echo "Git Commit: $GIT_COMMIT_SHORT"
                     echo "==================================="
                 '''
             }
         }
-        
         success {
-            echo '✅ Test pipeline executed successfully!'
+            echo '✅ Pipeline executed successfully!'
             script {
-                def shouldSendNotification = params.SEND_SUCCESS_NOTIFICATION
-                
-                if (shouldSendNotification) {
-                    def successMessage = """
-✅ JENKINS TEST PIPELINE SUCCEEDED ✅
-
-🧪 This is a TEST notification from the failure testing pipeline
+                sh '''
+                    echo "🎉 Deployment successful!"
+                    echo "Check your application at:"
+                    kubectl get ingress -n $NAMESPACE
+                '''
+            }
+            
+            // Send SNS notification on success
+            script {
+                def successMessage = """
+✅ JENKINS PIPELINE SUCCEEDED ✅
 
 Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 Git Commit: ${env.GIT_COMMIT_SHORT}
 Duration: ${currentBuild.durationString}
-Failure Type Tested: ${env.FAILURE_TYPE}
+
+Application: ${env.APP_NAME}
+Namespace: ${env.NAMESPACE}
+Image: ${env.IMAGE_REPO}:${env.IMAGE_TAG}
 
 Build URL: ${env.BUILD_URL}
 
-🎉 Test completed successfully!
-Your SNS email notification system is working correctly.
+🚀 Deployment completed successfully!
+Your application is now running with the latest changes.
+
+Application URL: http://my-eks-cluster-web-alb-1309538953.ap-south-1.elb.amazonaws.com
 
 Time: ${new Date().toString()}
 
-This is a test notification from Jenkins CI/CD Pipeline.
-                    """.trim()
-                    
-                    try {
-                        sh """
-                            aws sns publish \\
-                                --topic-arn ${env.SNS_TOPIC_ARN} \\
-                                --subject "✅ TEST: Jenkins Pipeline Success Notification - ${env.JOB_NAME}" \\
-                                --message '${successMessage}' \\
-                                --region ${env.AWS_REGION}
-                        """
-                        echo "✅ Test success notification sent via SNS"
-                    } catch (Exception e) {
-                        echo "⚠️ Failed to send test success notification: ${e.getMessage()}"
-                    }
-                } else {
-                    echo "ℹ️ Success notification disabled - set SEND_SUCCESS_NOTIFICATION=true to test"
+This is an automated notification from Jenkins CI/CD Pipeline.
+                """.trim()
+                
+                // Send success notification via SNS
+                try {
+                    sh """
+                        aws sns publish \\
+                            --topic-arn ${env.SNS_TOPIC_ARN} \\
+                            --subject "✅ Jenkins Pipeline Succeeded: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}" \\
+                            --message '${successMessage}' \\
+                            --region ${env.AWS_REGION}
+                    """
+                    echo "✅ Success notification sent via SNS"
+                } catch (Exception e) {
+                    echo "⚠️ Failed to send success notification: ${e.getMessage()}"
                 }
             }
         }
-        
         failure {
-            echo '❌ Test pipeline failed (as expected)!'
+            echo '❌ Pipeline failed!'
             script {
                 sh '''
-                    echo "Pipeline failed at stage: $FAILURE_TYPE"
-                    echo "This failure was intentional for testing purposes"
+                    echo "Pipeline failed. Checking logs..."
+                    kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -10
                 '''
             }
             
             // Send SNS notification on failure
             script {
                 def failureMessage = """
-🔴 JENKINS TEST PIPELINE FAILED 🔴
-
-🧪 This is a TEST notification demonstrating failure alerts
+🔴 JENKINS PIPELINE FAILED 🔴
 
 Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
@@ -400,138 +361,35 @@ Git Commit: ${env.GIT_COMMIT_SHORT}
 Duration: ${currentBuild.durationString}
 Status: ${currentBuild.result}
 
-Failure Type: ${env.FAILURE_TYPE}
 Application: ${env.APP_NAME}
 Namespace: ${env.NAMESPACE}
+Image: ${env.IMAGE_REPO}:${env.IMAGE_TAG}
 
 Build URL: ${env.BUILD_URL}
 
-💡 Failure Simulation Details:
-This failure was intentionally triggered to test the email notification system.
-
-Common causes of '${env.FAILURE_TYPE}' failures:
-${getFailureDetails(env.FAILURE_TYPE)}
-
-🔍 Troubleshooting Steps:
-1. Check the Jenkins build logs at the URL above
-2. Verify AWS credentials and permissions
-3. Check EKS cluster connectivity
-4. Validate Docker and ECR configurations
-5. Review Kubernetes manifests for errors
+Recent Events:
+$(kubectl get events -n ${env.NAMESPACE} --sort-by='.lastTimestamp' --no-headers | tail -5 | awk '{print $6 " " $7 " " $8 " " $9 " " $10}' || echo "No recent events")
 
 Time: ${new Date().toString()}
 
-This is a test notification from Jenkins CI/CD Pipeline.
+This is an automated notification from Jenkins CI/CD Pipeline.
                 """.trim()
                 
                 try {
                     sh """
                         aws sns publish \\
                             --topic-arn ${env.SNS_TOPIC_ARN} \\
-                            --subject "❌ TEST: Jenkins Pipeline Failure Notification - ${env.FAILURE_TYPE}" \\
+                            --subject "❌ Jenkins Pipeline Failed: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}" \\
                             --message '${failureMessage}' \\
                             --region ${env.AWS_REGION}
                     """
-                    echo "✅ Test failure notification sent successfully via SNS"
+                    echo "✅ SNS notification sent successfully"
                 } catch (Exception e) {
-                    echo "⚠️ Failed to send test failure notification: ${e.getMessage()}"
+                    echo "⚠️ Failed to send SNS notification: ${e.getMessage()}"
+                    // Fallback: log the failure message for debugging
                     echo "Notification content: ${failureMessage}"
                 }
             }
         }
-        
-        aborted {
-            echo '⏹️ Test pipeline was aborted'
-            script {
-                def abortMessage = """
-⏹️ JENKINS TEST PIPELINE ABORTED ⏹️
-
-🧪 This is a TEST notification for pipeline abortion
-
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-Duration: ${currentBuild.durationString}
-Status: ABORTED
-
-Build URL: ${env.BUILD_URL}
-
-The pipeline was manually stopped or timed out during execution.
-
-Time: ${new Date().toString()}
-                """.trim()
-                
-                try {
-                    sh """
-                        aws sns publish \\
-                            --topic-arn ${env.SNS_TOPIC_ARN} \\
-                            --subject "⏹️ TEST: Jenkins Pipeline Aborted - ${env.JOB_NAME}" \\
-                            --message '${abortMessage}' \\
-                            --region ${env.AWS_REGION}
-                    """
-                    echo "✅ Test abort notification sent via SNS"
-                } catch (Exception e) {
-                    echo "⚠️ Failed to send test abort notification: ${e.getMessage()}"
-                }
-            }
-        }
-    }
-}
-
-def getFailureDetails(failureType) {
-    switch(failureType) {
-        case 'DOCKER_BUILD':
-            return '''
-- Dockerfile syntax errors
-- Missing base image or dependencies
-- Network issues during image build
-- Insufficient disk space
-- Docker daemon not running'''
-        
-        case 'ECR_PUSH':
-            return '''
-- ECR authentication failure
-- Repository doesn't exist
-- Network connectivity issues
-- IAM permissions insufficient
-- Registry quota exceeded'''
-        
-        case 'KUBERNETES_DEPLOY':
-            return '''
-- EKS cluster connectivity issues
-- kubectl authentication failure
-- Invalid Kubernetes manifests
-- Resource quota exceeded
-- Image pull errors'''
-        
-        case 'ENVIRONMENT_SETUP':
-            return '''
-- AWS credentials missing or invalid
-- Network connectivity issues
-- IAM permissions insufficient
-- Tool dependencies not installed'''
-        
-        case 'MANIFEST_UPDATE':
-            return '''
-- File permissions issues
-- Invalid file paths
-- Git repository access problems
-- Disk space insufficient'''
-        
-        case 'TIMEOUT_FAILURE':
-            return '''
-- Deployment rollout taking too long
-- Health checks failing continuously
-- Network issues causing delays
-- Resource constraints'''
-        
-        case 'SYNTAX_ERROR':
-            return '''
-- Invalid shell commands
-- Missing quotes or brackets
-- Undefined variables
-- Script syntax errors'''
-        
-        default:
-            return 'Unknown failure type - check Jenkins logs for details'
     }
 }

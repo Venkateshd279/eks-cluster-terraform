@@ -37,6 +37,10 @@ crash.*.log
 *.tfvars.json
 !terraform.tfvars.example
 
+# PowerShell Scripts (exclude from repository)
+*.ps1
+scripts/*.ps1
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
@@ -98,3 +102,10 @@ terraform.tfstate.d/
 # AWS credentials
 .aws/
 aws-credentials.txt
+
+# Shell Scripts and Executable Files
+*.sh
+*.bash
+*.zsh
+scripts/*.sh
+scripts/*.bash
