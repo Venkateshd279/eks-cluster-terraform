@@ -100,7 +100,13 @@ resource "aws_iam_policy" "jenkins_policy" {
           "ecr:CompleteLayerUpload",
           "ecr:CreateRepository",
           "ecr:DescribeRepositories",
-          "ecr:ListRepositories"
+          "ecr:ListRepositories",
+          "ecr:DescribeImages",
+          "ecr:ListImages",
+          "ecr:PutLifecyclePolicy",
+          "ecr:GetLifecyclePolicy",
+          "ecr:DeleteRepository",
+          "ecr:BatchDeleteImage"
         ]
         Resource = "*"
       },
