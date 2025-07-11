@@ -368,7 +368,7 @@ Image: ${env.IMAGE_REPO}:${env.IMAGE_TAG}
 Build URL: ${env.BUILD_URL}
 
 Recent Events:
-$(kubectl get events -n ${env.NAMESPACE} --sort-by='.lastTimestamp' --no-headers | tail -5 | awk '{print $6 " " $7 " " $8 " " $9 " " $10}' || echo "No recent events")
+\$(kubectl get events -n ${env.NAMESPACE} --sort-by='.lastTimestamp' --no-headers | tail -5 | awk '{print \$6 " " \$7 " " \$8 " " \$9 " " \$10}' || echo "No recent events")
 
 Time: ${new Date().toString()}
 
