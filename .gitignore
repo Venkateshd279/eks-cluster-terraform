@@ -103,9 +103,5 @@ terraform.tfstate.d/
 .aws/
 aws-credentials.txt
 
-# Shell Scripts and Executable Files
-*.sh
-*.bash
-*.zsh
-scripts/*.sh
-scripts/*.bash
+# Documentation folder (keep local only)
+docs/
