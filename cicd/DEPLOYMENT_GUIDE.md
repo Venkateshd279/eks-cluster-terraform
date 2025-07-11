@@ -8,7 +8,7 @@ This guide will walk you through setting up a complete CI/CD pipeline for deploy
 
 ### 1. **Jenkins Infrastructure**
 - **jenkins-server.tf**: Terraform configuration for Jenkins EC2 instance
-- **jenkins-setup.sh**: Automated setup script for Jenkins server
+- **jenkins-setup-ubuntu.sh**: Automated setup script for Jenkins server (Ubuntu)
 - **Jenkinsfile**: Complete pipeline for building and deploying applications
 
 ### 2. **Application Structure**
