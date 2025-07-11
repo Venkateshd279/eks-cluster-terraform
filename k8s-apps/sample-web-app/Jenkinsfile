@@ -18,6 +18,9 @@ pipeline {
         
         // Kubernetes manifests path
         K8S_MANIFESTS_PATH = 'k8s-apps/sample-web-app'
+        
+        // SNS Notification Configuration
+        SNS_TOPIC_ARN = 'arn:aws:sns:ap-south-1:897722681721:jenkins-pipeline-notifications'
     }
     
     stages {
@@ -268,6 +271,22 @@ pipeline {
                 }
             }
         }
+        
+        stage('Test Notification') {
+            when {
+                environment name: 'TEST_FAILURE', value: 'true'
+            }
+            steps {
+                echo '🧪 Testing failure notification...'
+                script {
+                    sh '''
+                        echo "This stage will intentionally fail to test SNS notifications"
+                        echo "You should receive an email notification after this failure"
+                        exit 1
+                    '''
+                }
+            }
+        }
     }
     
     post {
@@ -296,6 +315,45 @@ pipeline {
                     kubectl get ingress -n $NAMESPACE
                 '''
             }
+            
+            // Send SNS notification on success (optional - uncomment if needed)
+            script {
+                def successMessage = """
+✅ JENKINS PIPELINE SUCCEEDED ✅
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Git Commit: ${env.GIT_COMMIT_SHORT}
+Duration: ${currentBuild.durationString}
+
+Application: ${env.APP_NAME}
+Namespace: ${env.NAMESPACE}
+Image: ${env.IMAGE_REPO}:${env.IMAGE_TAG}
+
+Build URL: ${env.BUILD_URL}
+
+🚀 Deployment completed successfully!
+Your application is now running with the latest changes.
+
+Time: ${new Date().toString()}
+                """.trim()
+                
+                // Uncomment the lines below if you want success notifications
+                /*
+                try {
+                    sh """
+                        aws sns publish \\
+                            --topic-arn ${env.SNS_TOPIC_ARN} \\
+                            --subject "✅ Jenkins Pipeline Succeeded: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}" \\
+                            --message '${successMessage}' \\
+                            --region ${env.AWS_REGION}
+                    """
+                    echo "✅ Success notification sent via SNS"
+                } catch (Exception e) {
+                    echo "⚠️ Failed to send success notification: ${e.getMessage()}"
+                }
+                */
+            }
         }
         failure {
             echo '❌ Pipeline failed!'
@@ -304,6 +362,47 @@ pipeline {
                     echo "Pipeline failed. Checking logs..."
                     kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -10
                 '''
+            }
+            
+            // Send SNS notification on failure
+            script {
+                def failureMessage = """
+🔴 JENKINS PIPELINE FAILED 🔴
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Git Commit: ${env.GIT_COMMIT_SHORT}
+Duration: ${currentBuild.durationString}
+Status: ${currentBuild.result}
+
+Application: ${env.APP_NAME}
+Namespace: ${env.NAMESPACE}
+Image: ${env.IMAGE_REPO}:${env.IMAGE_TAG}
+
+Build URL: ${env.BUILD_URL}
+
+Recent Events:
+$(kubectl get events -n ${env.NAMESPACE} --sort-by='.lastTimestamp' --no-headers | tail -5 | awk '{print $6 " " $7 " " $8 " " $9 " " $10}' || echo "No recent events")
+
+Time: ${new Date().toString()}
+
+This is an automated notification from Jenkins CI/CD Pipeline.
+                """.trim()
+                
+                try {
+                    sh """
+                        aws sns publish \\
+                            --topic-arn ${env.SNS_TOPIC_ARN} \\
+                            --subject "❌ Jenkins Pipeline Failed: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}" \\
+                            --message '${failureMessage}' \\
+                            --region ${env.AWS_REGION}
+                    """
+                    echo "✅ SNS notification sent successfully"
+                } catch (Exception e) {
+                    echo "⚠️ Failed to send SNS notification: ${e.getMessage()}"
+                    // Fallback: log the failure message for debugging
+                    echo "Notification content: ${failureMessage}"
+                }
             }
         }
     }
